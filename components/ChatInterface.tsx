@@ -5,34 +5,59 @@ import { getAIGuidance } from '../services/gemini';
 
 interface ChatInterfaceProps {
   lesson: Lesson;
+  history: ChatMessage[];
+  onUpdateHistory: (messages: ChatMessage[]) => void;
   onComplete: () => void;
 }
 
-const ChatInterface: React.FC<ChatInterfaceProps> = ({ lesson, onComplete }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    { role: 'model', text: `太奶奶好！今天咱们学习第${lesson.day}天：${lesson.title}。${lesson.metaphor} 您对这个有什么想问的吗？或者我给您讲讲？` }
-  ]);
+const ChatInterface: React.FC<ChatInterfaceProps> = ({ lesson, history, onUpdateHistory, onComplete }) => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Initial greeting if history is empty
+  useEffect(() => {
+    if (history.length === 0) {
+      onUpdateHistory([
+        { role: 'model', text: `太奶奶好！今天咱们学习第${lesson.day}天：${lesson.title}。${lesson.metaphor} 您对这个有什么想问的吗？或者我给您讲讲？` }
+      ]);
+    }
+  }, []);
+
+  // Auto-scroll on message change
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [history, loading]);
 
-  const handleSend = async () => {
+  // Effect to handle AI response triggered by user messages in history
+  useEffect(() => {
+    const lastMessage = history[history.length - 1];
+    if (lastMessage && lastMessage.role === 'user' && !loading) {
+      const triggerAI = async () => {
+        setLoading(true);
+        try {
+          // Pass the conversation history up to the current user question
+          const prevHistory = history.slice(0, -1);
+          const responseText = await getAIGuidance(lesson, lastMessage.text, prevHistory);
+          
+          onUpdateHistory([...history, { role: 'model', text: responseText }]);
+        } catch (error) {
+          console.error("AI response failed", error);
+        } finally {
+          setLoading(false);
+        }
+      };
+      triggerAI();
+    }
+  }, [history]);
+
+  const handleSend = () => {
     if (!input.trim() || loading) return;
-
     const userMsg = input;
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
-    setLoading(true);
-
-    const response = await getAIGuidance(lesson, userMsg, messages);
-    setMessages(prev => [...prev, { role: 'model', text: response }]);
-    setLoading(false);
+    onUpdateHistory([...history, { role: 'user', text: userMsg }]);
   };
 
   return (
@@ -50,7 +75,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ lesson, onComplete }) => 
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#faf9f6]">
-        {messages.map((m, i) => (
+        {history.map((m, i) => (
           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[85%] p-4 rounded-2xl text-lg ${
               m.role === 'user' 

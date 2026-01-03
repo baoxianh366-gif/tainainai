@@ -12,7 +12,11 @@ export interface Lesson {
   description: string;
   category: '基础' | '逻辑' | '实战';
   status: LessonStatus;
-  metaphor: string; // 用生活中的例子解释
+  metaphor: string;
+  // 新增字段
+  longContent: string;   // 详细教学文本
+  keyPoint: string;     // 核心金句
+  hints: string[];      // 启发提问
 }
 
 export interface ChatMessage {
@@ -24,4 +28,5 @@ export interface UserState {
   currentDay: number;
   progress: number;
   completedLessons: number[];
+  chatHistory: Record<number, ChatMessage[]>;
 }
